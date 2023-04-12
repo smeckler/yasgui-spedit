@@ -1,4 +1,6 @@
 /*
+Reduced SPARQL 1.1 grammar for SPARQL_edit
+06.04.2023 S.Meckler
 
 SPARQL 1.1 grammar rules based on the Last Call Working Draft of 24/07/2012:
   http://www.w3.org/TR/2012/WD-sparql11-query-20120724/#sparqlGrammar
@@ -22,17 +24,15 @@ stephen.cresswell@tso.co.uk
 
 :-dynamic '==>'/2.
 
-sparql11 ==> [prologue,(queryAll or updateAll), $].
+sparql11 ==> [prologue,queryAll, $].
 queryUnit ==> [query,$].
-updateUnit ==> [update,$].
 
 query ==>
-	[prologue,or(selectQuery,constructQuery,describeQuery,askQuery),valuesClause].
+	[prologue,selectQuery,valuesClause].
 queryAll ==>
-	[or(selectQuery,constructQuery,describeQuery,askQuery),valuesClause].
+	[selectQuery,valuesClause].
 
 prologue ==>
-	%[?(baseDecl),*(prefixDecl)].
 	[*(baseDecl or prefixDecl)].
 
 baseDecl ==>
@@ -43,79 +43,33 @@ prefixDecl ==>
 
 % [7]
 selectQuery ==>
-	[selectClause,*(datasetClause),whereClause,solutionModifier].
-
-subSelect ==>
-        [selectClause,whereClause,solutionModifier,valuesClause].
+	[selectClause,?(datasetClause),whereClause,solutionModifier].
 
 % [9]
 selectClause ==>
 	['SELECT',
 	?('DISTINCT' or 'REDUCED'),
-	(+(var or ['(',expression,'AS',var,')']) or '*')].
+	(+var or '*')].
 
-%selectQuery ==>
-%	['SELECT',
-%	?('DISTINCT' or 'REDUCED'),
-%	(+(var) or '*'),
-%	*(datasetClause),whereClause,solutionModifier].
-
-%[10]
-constructQuery ==>
-	['CONSTRUCT',
- 	 [constructTemplate,*(datasetClause),whereClause,solutionModifier]
-         or
-	 [*(datasetClause),'WHERE','{',?(triplesTemplate),'}',solutionModifier]].
-
-describeQuery ==>
-	['DESCRIBE',+(varOrIRIref) or '*',
-	*(describeDatasetClause),?(whereClause),solutionModifier].
-
-askQuery ==>
-	['ASK',*(datasetClause),whereClause,solutionModifier].
-
-describeDatasetClause ==> % Not in spec - artificial distinction
-	['FROM',defaultGraphClause or namedGraphClause].
+% [13]
 datasetClause ==>
-	['FROM',defaultGraphClause or namedGraphClause].
+	['FROM',defaultGraphClause].
 
 defaultGraphClause ==>
 	[sourceSelector].
 
-namedGraphClause ==>
-	['NAMED',sourceSelector].
-
 sourceSelector ==>
 	[iriRef].
 
+% [17]
 whereClause ==>
 	[?('WHERE'),groupGraphPattern].
 
 %[18]
 solutionModifier ==>
-	[?(groupClause),?(havingClause),?(orderClause),?(limitOffsetClauses)].
+	[?(orderClause),?(limitOffsetClauses)].
 
-%[19]
-groupClause ==>
-	['GROUP','BY',+(groupCondition)].
-
-%[20]
-groupCondition ==>
-	[builtInCall].
-groupCondition ==>
-	[functionCall].
-groupCondition ==>
-	['(',expression,?(['AS',var]),')'].
-groupCondition ==>
-	[var].
-
-%[21]
-havingClause ==>
-	['HAVING',+(havingCondition)].
-%[22]
-havingCondition ==>
-	[constraint].
-
+%[23]
 orderClause ==>
 	['ORDER','BY',+(orderCondition)].
 
@@ -141,153 +95,28 @@ offsetClause ==>
 	['OFFSET','INTEGER'].
 
 %[28]
-%bindingsClause ==>
-%	['BINDINGS',*(var),'{',
-%	   *(['(',*(bindingValue),')'] or 'NIL'),
-%	   '}'].
-%bindingsClause ==> [].
-
-%[28]
 valuesClause ==> ['VALUES',dataBlock].
 valuesClause ==> [].
 
-%[29]
-update ==> [prologue,?([update1,?([';',update])])].
-updateAll ==> [?([update1,?([';',update])])].
-%[30]
-update1 ==> [load].
-update1 ==> [clear].
-update1 ==> [drop].
-update1 ==> [add].
-update1 ==> [move].
-update1 ==> [copy].
-update1 ==> [create].
-update1 ==> ['INSERT',insert1].
-update1 ==> ['DELETE',delete1].
-update1 ==> [modify].
-
-%[31]
-load ==> ['LOAD','?SILENT_1',iriRef,?(['INTO',graphRef])].
-clear ==> ['CLEAR','?SILENT_2',graphRefAll].
-drop ==> ['DROP','?SILENT_2',graphRefAll].
-create ==> ['CREATE','?SILENT_3',graphRef].
-add ==> ['ADD','?SILENT_4',graphOrDefault,'TO',graphOrDefault].
-move ==> ['MOVE','?SILENT_4',graphOrDefault,'TO',graphOrDefault].
-copy ==> ['COPY','?SILENT_4',graphOrDefault,'TO',graphOrDefault].
-
-% Distinguish uses of ?('SILENT') to keep table clean.
-% This is only needed because Flint uses the LL1 table to provide suggestions.
-'?SILENT_1'==>[].
-'?SILENT_1'==>['SILENT'].
-'?SILENT_2'==>[].
-'?SILENT_2'==>['SILENT'].
-'?SILENT_3'==>[].
-'?SILENT_3'==>['SILENT'].
-'?SILENT_4'==>[].
-'?SILENT_4'==>['SILENT'].
-
-%[38]-[41] Deviate from spec because we separated symbols e.g. was 'INSERT DATA'.
-% By separating symbols, we lose LL1 property, so have to re-jiggle grammar
-% to avoid multiple rules that begin with DELETE.
-insert1 ==> ['DATA',quadData].
-insert1 ==> [quadPattern,
-	    *(usingClause),
-	    'WHERE',
-	    groupGraphPattern].
-
-delete1 ==> ['DATA',quadDataNoBnodes].     % Originally nt deleteData
-delete1 ==> ['WHERE',quadPatternNoBnodes]. % Originally nt deleteWhere
-delete1 ==> [quadPatternNoBnodes,?(insertClause), % Originally part of nt modify
-	    *(usingClause),
-	    'WHERE',
-	    groupGraphPattern].
-
-%[41]
-% In the spec, WITH is optional, but we have refactored
-% and handled cases beginning 'DELETE' or 'INSERT'.
-modify ==>
-	['WITH',iriRef,
-	  [deleteClause,?(insertClause)] or insertClause,
-	  *(usingClause),
-	  'WHERE',
-	  groupGraphPattern].
-
-%[42]
-deleteClause ==>
-	['DELETE',quadPattern].
-%[43]
-insertClause ==>
-	['INSERT',quadPattern].
-%[44]
-usingClause ==>
-	['USING',iriRef or ['NAMED',iriRef]].
-%[45]
-graphOrDefault ==> ['DEFAULT'].
-graphOrDefault ==> [?('GRAPH'),iriRef].
-%[46]
-graphRef ==> ['GRAPH',iriRef].
-%[47]
-graphRefAll ==> [graphRef].
-graphRefAll ==> ['DEFAULT'].
-graphRefAll ==> ['NAMED'].
-graphRefAll ==> ['ALL'].
-%[48]
-quadPattern ==> ['{',quads,'}'].
-quadPatternNoBnodes ==> ['{',disallowBnodes,quads,allowBnodes,'}'].
-%[49]
-quadData ==> ['{',disallowVars,quads,allowVars,'}'].
-quadDataNoBnodes ==> ['{',disallowBnodes,disallowVars,quads,allowVars,allowBnodes,'}'].
-% Special NTs that have a hard-wired side-effect in parser code
-%  - conditions appear in notes 8 and 9 in grammar section of SPARQL1.1 spec.
-disallowVars==>[].
-allowVars==>[].
-disallowBnodes==>[].
-allowBnodes==>[].
-%[50]
-quads ==>
-	[?(triplesTemplate),*([quadsNotTriples,?('.'),?(triplesTemplate)])].
-%[51]
-quadsNotTriples ==>
-	['GRAPH',varOrIRIref,'{',?(triplesTemplate),'}'].
-%[52]
-triplesTemplate ==>
-	[triplesSameSubject,?(['.',?(triplesTemplate)])].
 %[53]
 groupGraphPattern ==>
-	['{',subSelect or groupGraphPatternSub,'}'].
-%groupGraphPattern ==> [
-%        '{',
-%        ?(triplesBlock),
-%	*([graphPatternNotTriples or filter, ?('.'), ?(triplesBlock)]),
-%	'}'].
+	['{',groupGraphPatternSub,'}'].
+
 %[54]
 groupGraphPatternSub ==>
 	[?(triplesBlock),*([graphPatternNotTriples,?('.'),?(triplesBlock)])].
+
 %[55]
 triplesBlock ==>
 	[triplesSameSubjectPath,?(['.',?(triplesBlock)])].
+
 %[56]
-graphPatternNotTriples ==> [groupOrUnionGraphPattern].
 graphPatternNotTriples ==> [optionalGraphPattern].
-graphPatternNotTriples ==> [minusGraphPattern].
-graphPatternNotTriples ==> [graphGraphPattern].
-graphPatternNotTriples ==> [serviceGraphPattern].
 graphPatternNotTriples ==> [filter].
-graphPatternNotTriples ==> [bind].
-graphPatternNotTriples ==> [inlineData].
+
 %[57]
 optionalGraphPattern ==> ['OPTIONAL',groupGraphPattern].
-%[58]
-graphGraphPattern ==>
-	['GRAPH',varOrIRIref,groupGraphPattern].
-%[59]
-serviceGraphPattern ==>
-	['SERVICE',?('SILENT'),varOrIRIref,groupGraphPattern].
-%[60]
-bind ==>
-	['BIND','(',expression,'AS',var,')'].
-%[61]
-inlineData ==> ['VALUES',dataBlock].
+
 %[62]
 dataBlock ==> [inlineDataOneVar or inlineDataFull].
 %[63]
@@ -302,12 +131,6 @@ dataBlockValue ==> [numericLiteral].
 dataBlockValue ==> [booleanLiteral].
 dataBlockValue ==> ['UNDEF'].
 
-%[66]
-minusGraphPattern ==>
-	['MINUS',groupGraphPattern].
-%[67]
-groupOrUnionGraphPattern ==>
-	[groupGraphPattern,*(['UNION',groupGraphPattern])].
 %[68]
 filter ==>
 	['FILTER',constraint].
@@ -329,12 +152,7 @@ argList ==>
 %[71]
 expressionList ==> ['NIL'].
 expressionList ==> ['(',expression,*([',',expression]),')'].
-%[73]
-constructTemplate ==>
-	['{',?(constructTriples),'}'].
-%[74]
-constructTriples ==>
-	[triplesSameSubject,?(['.',?(constructTriples)])].
+
 %[75]
 triplesSameSubject ==>
 	[varOrTerm,propertyListNotEmpty].
@@ -357,97 +175,45 @@ objectList ==>
 %[80]
 object ==>
 	[graphNode].
+
 %[81]
 triplesSameSubjectPath ==> [varOrTerm,propertyListPathNotEmpty].
 triplesSameSubjectPath ==> [triplesNodePath,propertyListPath].
 %[82]
 propertyListPath ==> [propertyListNotEmpty].
 propertyListPath ==> [].
-%[83]
+%[83] % change: verbSimple -> verb
 propertyListPathNotEmpty ==>
-	[verbPath or verbSimple,
-	objectListPath,
-	*([';',?([verbPath or verbSimple,objectListPath])])].
-%[84]
-verbPath ==> [path].
-%[85]
-verbSimple ==> [var].
+ 	[verb,
+ 	objectListPath,
+ 	*([';',?([verb,objectListPath])])].
+% propertyListPathNotEmpty ==>
+% 	[verbSimple,
+% 	objectListPath,
+% 	*([';',?([verbSimple,objectListPath])])].
+% %[85]
+% verbSimple ==> [var].
 %[86]
 objectListPath ==>
 	[objectPath,*([',',objectPath])].
 %[87]
 objectPath ==> [graphNodePath].
-%[88]
-path ==> [pathAlternative].
-%[89].
-pathAlternative ==>
-	[pathSequence,*(['|',pathSequence])].
-%[90]
-pathSequence ==>
-	[pathEltOrInverse,*(['/',pathEltOrInverse])].
-%[91]
-pathElt ==>
-	[pathPrimary,?(pathMod)].
-%[92]
-pathEltOrInverse ==> [pathElt].
-pathEltOrInverse ==> ['^',pathElt].
-%[93]  - last case below looks weird because
-%        {0} and {0,1} and {0,} and {,1} are allowed
-pathMod ==> ['*'].
-pathMod ==> ['?'].
-pathMod ==> ['+'].
-pathMod ==>
-	['{',
-          [integer,
-	     ([',', '}' or [integer,'}']])
-             or
-             '}'
-          ]
-          or
-          [',',integer,'}']
-        ].
 
-% Original expression from SPARQL1.1 spec:
-%'{' ( Integer
-%        ( ','
-%            ( '}' | Integer '}' )
-%        | '}' )
-%    | ',' Integer '}' )
-
-%[94]
-pathPrimary ==> [storeProperty,iriRef].
-pathPrimary ==> [storeProperty,'a'].
-pathPrimary ==> ['!',pathNegatedPropertySet].
-pathPrimary ==> ['(',path,')'].
-
-%[95]
-pathNegatedPropertySet ==>
-	[pathOneInPropertySet].
-pathNegatedPropertySet ==>
-	['(',
-	 ?([pathOneInPropertySet,
-	    *(['|',pathOneInPropertySet]) ]),
-         ')'].
-%[96]
-pathOneInPropertySet ==> [iriRef].
-pathOneInPropertySet ==> ['a'].
-pathOneInPropertySet ==> ['^',iriRef or 'a'].
 %[97]
 integer ==> ['INTEGER'].
+
 %[98]
-triplesNode ==> [collection].
 triplesNode ==> [blankNodePropertyList].
+
 %[99]
 blankNodePropertyList ==> ['[',propertyListNotEmpty,']'].
+
 %[100]
-triplesNodePath ==> [collectionPath].
 triplesNodePath ==> [blankNodePropertyListPath].
+
 %[101]
 blankNodePropertyListPath ==> ['[',propertyListPathNotEmpty,']'].
-%[102]
-collection ==> ['(',+(graphNode),')'].
-%[103]
-collectionPath ==> ['(',+(graphNodePath),')'].
+
 %[104]
 graphNode ==> [varOrTerm].
 graphNode ==> [triplesNode].
@@ -469,7 +235,7 @@ graphTerm ==> [rdfLiteral].
 graphTerm ==> [numericLiteral].
 graphTerm ==> [booleanLiteral].
 graphTerm ==> [blankNode].
-graphTerm ==> ['NIL'].
+
 %[110]
 expression ==> [conditionalOrExpression].
 %[111]
