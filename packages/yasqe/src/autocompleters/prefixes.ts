@@ -90,11 +90,27 @@ var conf: Autocompleter.CompleterConfig = {
     if (!previousToken || previousToken.string.toUpperCase() != "PREFIX") return false;
     return true;
   },
+  // // use URL specified in the yasqe config to download the list of prefixes
+  // // downloads from 'http://prefix.cc/popular/all.file.json' by default
+  // // if yasqe is hosted on https, it wants to dl from https://prefix.cc/... but fails (invalid vertificate)
+  // get: function (yasqe) {
+  //   return superagent.get(yasqe.config.prefixCcApi).then((resp) => {
+  //     var prefixArray: string[] = [];
+  //     for (var prefix in resp.body) {
+  //       var completeString = prefix + ": <" + resp.body[prefix] + ">";
+  //       prefixArray.push(completeString); // the array we want to store in localstorage
+  //     }
+  //     return prefixArray.sort();
+  //   });
+  // },
+  // // alternative: (dynamically) load local list of prefixes from a module bundled into the lib
+  // // we miss updates on prefix.cc but it's better than a blocked/failed request
   get: function (yasqe) {
-    return superagent.get(yasqe.config.prefixCcApi).then((resp) => {
+    return import("./prefixccdata").then((module) => {
+      const prefixlist = module.prefixccdata;
       var prefixArray: string[] = [];
-      for (var prefix in resp.body) {
-        var completeString = prefix + ": <" + resp.body[prefix] + ">";
+      for (var prefix in prefixlist) {
+        var completeString = prefix + ": <" + prefixlist[prefix] + ">";
         prefixArray.push(completeString); // the array we want to store in localstorage
       }
       return prefixArray.sort();

@@ -114,9 +114,6 @@ export declare class Yasqe extends CodeMirror {
     static registerAutocompleter(value: Autocompleter.CompleterConfig, enable?: boolean): void;
     static defaults: {
         requestConfig: PlainRequestConfig;
-        persistenceId: string | ((yasqe: Yasqe) => string);
-        persistencyExpire: number;
-        tabindex?: number;
         value?: any;
         mode: string;
         theme?: string;
@@ -146,6 +143,7 @@ export declare class Yasqe extends CodeMirror {
         selectionsMayTouch?: boolean;
         undoDepth?: number;
         historyEventDelay?: number;
+        tabindex?: number;
         autofocus?: boolean;
         dragDrop?: boolean;
         allowDropFileTypes?: string[];
@@ -171,6 +169,8 @@ export declare class Yasqe extends CodeMirror {
         createShareableLink: (yasqe: Yasqe) => string;
         createShortLink: (yasqe: Yasqe, longLink: string) => Promise<string>;
         consumeShareLink: (yasqe: Yasqe) => void;
+        persistenceId: string | ((yasqe: Yasqe) => string);
+        persistencyExpire: number;
         showQueryButton: boolean;
         pluginButtons: () => HTMLElement | HTMLElement[];
         highlightSelectionMatches: {
