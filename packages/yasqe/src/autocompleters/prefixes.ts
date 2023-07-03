@@ -5,6 +5,7 @@ var tokenTypes: { [id: string]: "prefixed" | "var" } = {
   atom: "var",
 };
 import * as superagent from "superagent";
+import { prefixccdata } from "./prefixccdata"
 
 var conf: Autocompleter.CompleterConfig = {
   postprocessHints: function (_yasqe, hints) {
@@ -103,17 +104,17 @@ var conf: Autocompleter.CompleterConfig = {
   //     return prefixArray.sort();
   //   });
   // },
-  // // alternative: (dynamically) load local list of prefixes from a module bundled into the lib
+  // // alternative: load local list of prefixes from a module bundled into the lib
   // // we miss updates on prefix.cc but it's better than a blocked/failed request
   get: function (yasqe) {
-    return import("./prefixccdata").then((module) => {
-      const prefixlist = module.prefixccdata;
+    return new Promise((resolve,reject) => {
+      const prefixlist = prefixccdata;
       var prefixArray: string[] = [];
       for (var prefix in prefixlist) {
         var completeString = prefix + ": <" + prefixlist[prefix] + ">";
         prefixArray.push(completeString); // the array we want to store in localstorage
       }
-      return prefixArray.sort();
+      resolve(prefixArray.sort());
     });
   },
   preProcessToken: function (yasqe, token) {
