@@ -1,8 +1,6 @@
 import { addClass, drawSvgStringAsElement, removeClass } from "@triply/yasgui-utils";
 import "./TabPanel.scss";
 import Tab from "./Tab";
-import { RequestConfig } from "@triply/yasqe";
-import { toPairs, fromPairs } from "lodash-es";
 const AcceptOptionsMap: { key: string; value: string }[] = [
   { key: "JSON", value: "application/sparql-results+json" },
   { key: "XML", value: "application/sparql-results+xml" },
@@ -68,30 +66,7 @@ export default class TabPanel {
     };
     this.drawBody();
   }
-  private updateBody() {
-    const reqConfig = this.tab.getRequestConfig();
-    if (typeof reqConfig.method !== "function") {
-      this.setRequestMethod(reqConfig.method);
-    }
-
-    // Draw Accept headers
-    this.setAcceptHeader_select(<string>reqConfig.acceptHeaderSelect);
-    this.setAcceptHeader_graph(<string>reqConfig.acceptHeaderGraph);
-    // console.log('setting args',reqConfig.args)
-    if (typeof reqConfig.args !== "function") {
-      this.setArguments([...reqConfig.args] || []);
-    }
-
-    if (typeof reqConfig.headers !== "function") {
-      this.setHeaders(toPairs(reqConfig.headers).map(([name, value]) => ({ name, value })));
-    }
-    if (typeof reqConfig.defaultGraphs !== "function") {
-      this.setDefaultGraphs([...reqConfig.defaultGraphs] || []);
-    }
-    if (typeof reqConfig.namedGraphs !== "function") {
-      this.setNamedGraphs([...reqConfig.namedGraphs] || []);
-    }
-  }
+  private updateBody() {}
 
   public open(ev: MouseEvent) {
     if (!this.isOpen) {
@@ -127,7 +102,7 @@ export default class TabPanel {
     this.settingsButton.setAttribute("aria-label", this.isOpen ? "Close settings" : "Open settings");
     this.settingsButton.setAttribute("aria-expanded", `${this.isOpen}`);
   }
-  private setRequestMethod!: (method: Exclude<RequestConfig<any>["method"], Function>) => void;
+  private setRequestMethod!: (method: any) => void;
   private drawRequestMethodSelector() {
     const requestTypeWrapper = document.createElement("div");
     addClass(requestTypeWrapper, "requestConfigWrapper");
@@ -140,7 +115,7 @@ export default class TabPanel {
     const postButton = document.createElement("button");
     addClass(postButton, "selectorButton");
     postButton.innerText = "POST";
-    addClass(this.tab.getRequestConfig().method === "GET" ? getButton : postButton, "selected");
+    addClass(undefined);
 
     this.setRequestMethod = (method) => {
       if (method === "GET") {
@@ -152,11 +127,9 @@ export default class TabPanel {
       }
     };
     getButton.onclick = () => {
-      this.tab.setRequestConfig({ method: "GET" });
       this.setRequestMethod("GET");
     };
     postButton.onclick = () => {
-      this.tab.setRequestConfig({ method: "POST" });
       this.setRequestMethod("POST");
     };
 
@@ -173,20 +146,11 @@ export default class TabPanel {
     addClass(acceptWrapper, "requestConfigWrapper", "acceptWrapper");
     createLabel("Accept Headers", acceptWrapper);
     // Request type
-    this.setAcceptHeader_select = createSelector(
-      AcceptOptionsMap,
-      (ev) => {
-        this.tab.setRequestConfig({ acceptHeaderSelect: (<HTMLOptionElement>ev.target).value });
-      },
-      "Ask / Select",
-      acceptWrapper
-    );
+    this.setAcceptHeader_select = createSelector(AcceptOptionsMap, (ev) => {}, "Ask / Select", acceptWrapper);
 
     this.setAcceptHeader_graph = createSelector(
       AcceptHeaderGraphMap,
-      (ev) => {
-        this.tab.setRequestConfig({ acceptHeaderGraph: (<HTMLOptionElement>ev.target).value });
-      },
+      (ev) => {},
       "Construct / Describe",
       acceptWrapper
     );
@@ -196,16 +160,7 @@ export default class TabPanel {
 
   private setArguments!: (args: TextInputPair[]) => void;
   private drawArgumentsInput() {
-    const onBlur = () => {
-      const args: Exclude<RequestConfig<any>["args"], Function> = [];
-      argumentsWrapper.querySelectorAll(".textRow").forEach((row) => {
-        const [name, value] = row.children;
-        if (name instanceof HTMLInputElement && value instanceof HTMLInputElement && name.value.length) {
-          args.push({ name: name.value, value: value.value });
-        }
-      });
-      this.tab.setRequestConfig({ args: args });
-    };
+    const onBlur = () => {};
     const argumentsWrapper = document.createElement("div");
     addClass(argumentsWrapper, "requestConfigWrapper", "textSetting");
 
@@ -222,7 +177,6 @@ export default class TabPanel {
         const argRow = drawDoubleInputWhenEmpty(argumentsWrapper, argIndex, args, onBlur);
         getRemoveButton(() => {
           args.splice(argIndex, 1);
-          this.tab.setRequestConfig({ args: args });
           this.setArguments(args);
         }, argRow);
       }
@@ -232,16 +186,7 @@ export default class TabPanel {
 
   private setHeaders!: (headers: TextInputPair[]) => void;
   private drawHeaderInput() {
-    const onBlur = () => {
-      const headers: Exclude<RequestConfig<any>["headers"], Function> = {};
-      headerWrapper.querySelectorAll(".textRow").forEach((row) => {
-        const [name, value] = row.children;
-        if (name instanceof HTMLInputElement && value instanceof HTMLInputElement && name.value.length) {
-          headers[name.value] = value.value;
-        }
-      });
-      this.tab.setRequestConfig({ headers: headers });
-    };
+    const onBlur = () => {};
     const headerWrapper = document.createElement("div");
     addClass(headerWrapper, "requestConfigWrapper", "textSetting");
 
@@ -260,7 +205,6 @@ export default class TabPanel {
         // getRemoveButton(() => (headers[headerIndex] = undefined), headerRow);
         getRemoveButton(() => {
           headers.splice(headerIndex, 1);
-          this.tab.setRequestConfig({ headers: fromPairs(headers.map((h) => [h.name, h.value])) });
           this.setHeaders(headers);
         }, headerRow);
       }
@@ -278,16 +222,7 @@ export default class TabPanel {
 
     this.menuElement.appendChild(defaultGraphWrapper);
 
-    const onBlur = () => {
-      const graphs: Exclude<RequestConfig<any>["defaultGraphs"], Function> = [];
-      defaultGraphWrapper.querySelectorAll(".graphInput").forEach((row) => {
-        const [el] = row.children;
-        if (el instanceof HTMLInputElement && el.value.length) {
-          graphs.push(el.value);
-        }
-      });
-      this.tab.setRequestConfig({ defaultGraphs: graphs });
-    };
+    const onBlur = () => {};
     this.setDefaultGraphs = (defaultGraphs) => {
       defaultGraphWrapper.querySelectorAll(".graphInput").forEach((child) => {
         defaultGraphWrapper.removeChild(child);
@@ -309,16 +244,7 @@ export default class TabPanel {
     namedGraphWrapper.appendChild(namedGraphLabel);
     this.menuElement.appendChild(namedGraphWrapper);
 
-    const onBlur = () => {
-      const graphs: Exclude<RequestConfig<any>["namedGraphs"], Function> = [];
-      namedGraphWrapper.querySelectorAll(".graphInput").forEach((row) => {
-        const [el] = row.children;
-        if (el instanceof HTMLInputElement && el.value.length) {
-          graphs.push(el.value);
-        }
-      });
-      this.tab.setRequestConfig({ namedGraphs: graphs });
-    };
+    const onBlur = () => {};
 
     this.setNamedGraphs = (namedGraphs) => {
       namedGraphWrapper.querySelectorAll(".graphInput").forEach((child) => {

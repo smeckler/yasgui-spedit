@@ -1,8 +1,22 @@
-import { default as Yasqe, PlainRequestConfig } from "./";
+import { default as Yasqe } from "./";
 export default function get(): {
-    requestConfig: PlainRequestConfig;
-    value?: any;
     mode: string;
+    collapsePrefixesOnLoad: boolean;
+    syntaxErrorCheck: boolean;
+    persistenceId: string | ((yasqe: Yasqe) => string);
+    persistencyExpire: number;
+    highlightSelectionMatches: {
+        showToken?: RegExp;
+        annotateScrollbar?: boolean;
+    };
+    tabMode: string;
+    foldGutter: any;
+    matchBrackets: boolean;
+    autocompleters: string[];
+    hintConfig: Partial<import("./").HintConfig>;
+    resizeable: boolean;
+    editorHeight: string;
+    value?: any;
     theme?: string;
     indentUnit?: number;
     smartIndent?: boolean;
@@ -17,7 +31,6 @@ export default function get(): {
     firstLineNumber?: number;
     lineNumberFormatter?: (line: number) => string;
     gutters?: string[];
-    foldGutter: any;
     fixedGutter?: boolean;
     scrollbarStyle?: string;
     coverGutterNextToScrollbar?: boolean;
@@ -51,25 +64,4 @@ export default function get(): {
     autocorrect?: boolean;
     autocapitalize?: boolean;
     lint?: boolean | import("codemirror").LintStateOptions | import("codemirror").Linter | import("codemirror").AsyncLinter;
-    collapsePrefixesOnLoad: boolean;
-    syntaxErrorCheck: boolean;
-    createShareableLink: (yasqe: Yasqe) => string;
-    createShortLink: (yasqe: Yasqe, longLink: string) => Promise<string>;
-    consumeShareLink: (yasqe: Yasqe) => void;
-    persistenceId: string | ((yasqe: Yasqe) => string);
-    persistencyExpire: number;
-    showQueryButton: boolean;
-    pluginButtons: () => HTMLElement | HTMLElement[];
-    highlightSelectionMatches: {
-        showToken?: RegExp;
-        annotateScrollbar?: boolean;
-    };
-    tabMode: string;
-    matchBrackets: boolean;
-    autocompleters: string[];
-    hintConfig: Partial<import("./").HintConfig>;
-    resizeable: boolean;
-    editorHeight: string;
-    queryingDisabled: string;
-    prefixCcApi: string;
 };

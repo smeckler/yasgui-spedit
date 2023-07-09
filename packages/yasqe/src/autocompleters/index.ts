@@ -1,10 +1,11 @@
 import { default as Yasqe, Token, Hint, Position, Config, HintFn, HintConfig } from "../";
 import Trie from "../trie";
 import { EventEmitter } from "events";
-import * as superagent from "superagent";
 import { take } from "lodash-es";
+
 const CodeMirror = require("codemirror");
 require("./show-hint.scss");
+
 export interface CompleterConfig {
   onInitialize?: (this: CompleterConfig, yasqe: Yasqe) => void; //allows for e.g. registering event listeners in yasqe, like the prefix autocompleter does
   isValidCompletionPosition: (yasqe: Yasqe) => boolean;
@@ -309,31 +310,25 @@ export const fetchFromLov = (
     yasqe.showNotification(notificationKey, "Nothing to autocomplete yet!");
     return Promise.resolve([]);
   }
-  // //if notification bar is there, show a loader
-  // yasqe.autocompleters.notifications
-  //   .getEl(completer)
-  //   .empty()
-  //   .append($("<span>Fetchting autocompletions &nbsp;</span>"))
-  //   .append($(yutils.svg.getElement(require("../imgs.js").loader)).addClass("notificationLoader"));
-  // doRequests();
-  return superagent
-    .get(reqProtocol + "lov.linkeddata.es/dataset/lov/api/v2/autocomplete/terms")
-    .query({
-      q: token.autocompletionString,
-      page_size: 50,
-      type: type,
-    })
-    .then(
-      (result) => {
-        if (result.body.results) {
-          return result.body.results.map((r: any) => r.uri[0]);
-        }
-        return [];
-      },
-      (_e) => {
-        yasqe.showNotification(notificationKey, "Failed fetching suggestions");
+  var url = new URL(reqProtocol + "lov.linkeddata.es/dataset/lov/api/v2/autocomplete/terms");
+  var params = {
+    q: token.autocompletionString ? token.autocompletionString : "",
+    page_size: "50",
+    type: type,
+  };
+  url.search = new URLSearchParams(params).toString();
+  return fetch(url.toString())
+    .then((resp) => resp.json())
+    .then((result) => {
+      if (result.results) {
+        console.log(result.results);
+        return result.results.map((r: any) => r.uri[0]);
       }
-    );
+      return [];
+    })
+    .catch((e) => {
+      yasqe.showNotification(notificationKey, "Failed fetching suggestions");
+    });
 };
 
 import variableCompleter from "./variables";

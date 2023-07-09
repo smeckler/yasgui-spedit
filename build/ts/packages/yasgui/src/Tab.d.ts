@@ -2,8 +2,7 @@
 import { EventEmitter } from "events";
 import { default as Yasqe } from "@triply/yasqe";
 import { default as Yasr, Parser, PersistentConfig as YasrPersistentConfig } from "@triply/yasr";
-import * as shareLink from "./linkUtils";
-import { default as Yasgui, YasguiRequestConfig } from "./";
+import { default as Yasgui } from "./";
 export interface PersistedJsonYasr extends YasrPersistentConfig {
     responseSummary: Parser.ResponseSummary;
 }
@@ -18,7 +17,6 @@ export interface PersistedJson {
         settings: YasrPersistentConfig;
         response: Parser.ResponseSummary | undefined;
     };
-    requestConfig: YasguiRequestConfig;
 }
 export interface Tab {
     on(event: string | symbol, listener: (...args: any[]) => void): this;
@@ -61,7 +59,7 @@ export declare class Tab extends EventEmitter {
     close(): void;
     getQuery(): string;
     setQuery(query: string): this;
-    getRequestConfig(): YasguiRequestConfig;
+    getRequestConfig(): any;
     private initControlbar;
     getYasqe(): Yasqe;
     getYasr(): Yasr;
@@ -71,15 +69,11 @@ export declare class Tab extends EventEmitter {
     setEndpoint(endpoint: string, endpointHistory?: string[]): this;
     getEndpoint(): string;
     updateContextMenu(): void;
-    getShareableLink(baseURL?: string): string;
-    getShareObject(): shareLink.ShareConfigObject;
     private getTabListEl;
     setName(newName: string): this;
     hasResults(): boolean;
     getName(): string;
     query(): Promise<any>;
-    setRequestConfig(requestConfig: Partial<YasguiRequestConfig>): void;
-    private getStaticRequestConfig;
     private initYasqe;
     private destroyYasqe;
     handleYasqeBlur: (yasqe: Yasqe) => void;

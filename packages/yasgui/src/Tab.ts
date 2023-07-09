@@ -2,14 +2,14 @@ import { EventEmitter } from "events";
 import { addClass, removeClass, getAsValue } from "@triply/yasgui-utils";
 import { TabListEl } from "./TabElements";
 import TabPanel from "./TabPanel";
-import { default as Yasqe, RequestConfig, PlainRequestConfig, PartialConfig as YasqeConfig } from "@triply/yasqe";
+import { default as Yasqe, PartialConfig as YasqeConfig } from "@triply/yasqe";
 import { default as Yasr, Parser, Config as YasrConfig, PersistentConfig as YasrPersistentConfig } from "@triply/yasr";
-import { mapValues, eq, mergeWith, words, deburr, invert } from "lodash-es";
+import { mapValues, eq, words, deburr, invert } from "lodash-es";
 import * as shareLink from "./linkUtils";
 import EndpointSelect from "./endpointSelect";
 import * as superagent from "superagent";
 require("./tab.scss");
-import { getRandomId, default as Yasgui, YasguiRequestConfig } from "./";
+import { getRandomId, default as Yasgui } from "./";
 export interface PersistedJsonYasr extends YasrPersistentConfig {
   responseSummary: Parser.ResponseSummary;
 }
@@ -24,7 +24,6 @@ export interface PersistedJson {
     settings: YasrPersistentConfig;
     response: Parser.ResponseSummary | undefined;
   };
-  requestConfig: YasguiRequestConfig;
 }
 export interface Tab {
   on(event: string | symbol, listener: (...args: any[]) => void): this;
@@ -122,7 +121,6 @@ export class Tab extends EventEmitter {
     this.yasgui.selectTabId(this.persistentJson.id);
   }
   public close() {
-    if (this.yasqe) this.yasqe.abortQuery();
     if (this.yasgui.getTab() === this) {
       //it's the active tab
       //first select other tab
@@ -155,7 +153,7 @@ export class Tab extends EventEmitter {
     return this;
   }
   public getRequestConfig() {
-    return this.persistentJson.requestConfig;
+    return undefined;
   }
   private initControlbar() {
     this.initEndpointSelectField();
@@ -215,18 +213,13 @@ export class Tab extends EventEmitter {
     }
     this.checkEndpointForCors(endpoint); //little cost in checking this as we're caching the check results
 
-    if (this.persistentJson.requestConfig.endpoint !== endpoint) {
-      this.persistentJson.requestConfig.endpoint = endpoint;
-      this.emit("change", this, this.persistentJson);
-      this.emit("endpointChange", this, endpoint);
-    }
     if (this.endpointSelect instanceof EndpointSelect) {
       this.endpointSelect.setEndpoint(endpoint, endpointHistory);
     }
     return this;
   }
   public getEndpoint(): string {
-    return getAsValue(this.persistentJson.requestConfig.endpoint, this.yasgui);
+    return getAsValue("", this.yasgui);
   }
   /**
    * Updates the position of the Tab's contextmenu
@@ -234,12 +227,6 @@ export class Tab extends EventEmitter {
    */
   public updateContextMenu(): void {
     this.getTabListEl().redrawContextMenu();
-  }
-  public getShareableLink(baseURL?: string): string {
-    return shareLink.createShareLink(baseURL || window.location.href, this);
-  }
-  public getShareObject() {
-    return shareLink.createShareConfig(this);
   }
   private getTabListEl(): TabListEl {
     return this.yasgui.tabElements.get(this.persistentJson.id);
@@ -259,41 +246,7 @@ export class Tab extends EventEmitter {
   }
   public query(): Promise<any> {
     if (!this.yasqe) return Promise.reject(new Error("No yasqe editor initialized"));
-    return this.yasqe.query();
-  }
-  public setRequestConfig(requestConfig: Partial<YasguiRequestConfig>) {
-    this.persistentJson.requestConfig = {
-      ...this.persistentJson.requestConfig,
-      ...requestConfig,
-    };
-
-    this.emit("change", this, this.persistentJson);
-  }
-
-  /**
-   * The Yasgui configuration object may contain a custom request config
-   * This request config object can contain getter functions, or plain json
-   * The plain json data is stored in persisted config, and editable via the
-   * tab pane.
-   * The getter functions are not. This function is about fetching this part of the
-   * request configuration, so we can merge this with the configuration from the
-   * persistent config and tab pane.
-   *
-   * Considering some values will never be persisted (things that should always be a function),
-   * we provide that as part of a whitelist called `keepDynamic`
-   */
-  private getStaticRequestConfig() {
-    const config: Partial<PlainRequestConfig> = {};
-    let key: keyof YasguiRequestConfig;
-    for (key in this.yasgui.config.requestConfig) {
-      //This config option should never be static or persisted anyway
-      if (key === "adjustQueryBeforeRequest") continue;
-      const val = this.yasgui.config.requestConfig[key];
-      if (typeof val === "function") {
-        (config[key] as any) = val(this.yasgui);
-      }
-    }
-    return config;
+    return new Promise(() => {});
   }
 
   private initYasqe() {
@@ -302,41 +255,6 @@ export class Tab extends EventEmitter {
       value: this.persistentJson.yasqe.value,
       editorHeight: this.persistentJson.yasqe.editorHeight ? this.persistentJson.yasqe.editorHeight : undefined,
       persistenceId: null, //yasgui handles persistent storing
-      consumeShareLink: null, //not handled by this tab, but by parent yasgui instance
-      createShareableLink: () => this.getShareableLink(),
-      requestConfig: () => {
-        const processedReqConfig: YasguiRequestConfig = {
-          //setting defaults
-          //@ts-ignore
-          acceptHeaderGraph: "text/turtle",
-          //@ts-ignore
-          acceptHeaderSelect: "application/sparql-results+json",
-          ...mergeWith({}, this.persistentJson.requestConfig, this.getStaticRequestConfig(), function customizer(
-            objValue,
-            srcValue
-          ) {
-            if (Array.isArray(objValue) || Array.isArray(srcValue)) {
-              return [...(objValue || []), ...(srcValue || [])];
-            }
-          }),
-          //Passing this manually. Dont want to use our own persistentJson, as that's flattened exclude functions
-          //The adjustQueryBeforeRequest is meant to be a function though, so let's copy that as is
-          adjustQueryBeforeRequest: this.yasgui.config.requestConfig.adjustQueryBeforeRequest,
-        };
-        if (this.yasgui.config.corsProxy && !Yasgui.corsEnabled[this.getEndpoint()]) {
-          return {
-            ...processedReqConfig,
-            args: [
-              ...(Array.isArray(processedReqConfig.args) ? processedReqConfig.args : []),
-              { name: "endpoint", value: this.getEndpoint() },
-              { name: "method", value: this.persistentJson.requestConfig.method },
-            ],
-            method: "POST",
-            endpoint: this.yasgui.config.corsProxy,
-          } as PlainRequestConfig;
-        }
-        return processedReqConfig as PlainRequestConfig;
-      },
     };
     if (!yasqeConf.hintConfig) {
       yasqeConf.hintConfig = {};
@@ -350,24 +268,18 @@ export class Tab extends EventEmitter {
     this.yasqe = new Yasqe(this.yasqeWrapperEl, yasqeConf);
 
     this.yasqe.on("blur", this.handleYasqeBlur);
-    this.yasqe.on("query", this.handleYasqeQuery);
     this.yasqe.on("queryAbort", this.handleYasqeQueryAbort);
     this.yasqe.on("resize", this.handleYasqeResize);
 
     this.yasqe.on("autocompletionShown", this.handleAutocompletionShown);
     this.yasqe.on("autocompletionClose", this.handleAutocompletionClose);
-
-    this.yasqe.on("queryResponse", this.handleQueryResponse);
   }
   private destroyYasqe() {
     // As Yasqe extends of CM instead of eventEmitter, it doesn't expose the removeAllListeners function, so we should unregister all events manually
     this.yasqe?.off("blur", this.handleYasqeBlur);
-    this.yasqe?.off("query", this.handleYasqeQuery);
-    this.yasqe?.off("queryAbort", this.handleYasqeQueryAbort);
     this.yasqe?.off("resize", this.handleYasqeResize);
     this.yasqe?.off("autocompletionShown", this.handleAutocompletionShown);
     this.yasqe?.off("autocompletionClose", this.handleAutocompletionClose);
-    this.yasqe?.off("queryResponse", this.handleQueryResponse);
     this.yasqe?.destroy();
     this.yasqe = undefined;
   }
@@ -431,10 +343,7 @@ export class Tab extends EventEmitter {
       defaultPlugin: this.persistentJson.yasr.settings.selectedPlugin,
       getPlainQueryLinkToEndpoint: () => {
         if (this.yasqe) {
-          return shareLink.appendArgsToUrl(
-            this.getEndpoint(),
-            Yasqe.Sparql.getUrlArguments(this.yasqe, this.persistentJson.requestConfig as RequestConfig<any>)
-          );
+          return shareLink.appendArgsToUrl(this.getEndpoint(), { fakeRequestArgs: "string" });
         }
       },
       plugins: mapValues(this.persistentJson.yasr.settings.pluginsConfig, (conf) => ({
@@ -485,7 +394,6 @@ export class Tab extends EventEmitter {
           pluginsConfig: {},
         },
       },
-      requestConfig: yasgui ? yasgui.config.requestConfig : { ...Yasgui.defaults.requestConfig },
       id: getRandomId(),
       name: yasgui ? yasgui.createTabName() : Yasgui.defaults.tabName,
     };
@@ -510,9 +418,7 @@ function getCorsErrorRenderer(tab: Tab) {
         }</a>).<br>This is not allowed in modern browsers, see <a target="_blank" rel="noopener noreferrer" href="https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy">https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy</a>.`;
         if (tab.yasgui.config.nonSslDomain) {
           const errorLink = document.createElement("p");
-          errorLink.innerHTML = `As a workaround, you can use the HTTP version of Yasgui instead: <a href="${tab.getShareableLink(
-            tab.yasgui.config.nonSslDomain
-          )}" target="_blank">${tab.yasgui.config.nonSslDomain}</a>`;
+          errorLink.innerHTML = `As a workaround, you can use the HTTP version of Yasgui instead: <a href="" target="_blank">${tab.yasgui.config.nonSslDomain}</a>`;
           errorSpan.appendChild(errorLink);
         }
         errorEl.appendChild(errorSpan);

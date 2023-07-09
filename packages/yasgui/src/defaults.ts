@@ -58,7 +58,6 @@ export default function initialize(): Config<CatalogueItem> {
     copyEndpointOnNewTab: true,
     populateFromUrl: true,
     autoAddOnInit: true,
-    requestConfig: Yasqe.defaults.requestConfig,
     contextMenuContainer: undefined,
   };
 }

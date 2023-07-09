@@ -1,15 +1,12 @@
 require("./scss/yasqe.scss");
-require("./scss/buttons.scss");
-import * as superagent from "superagent";
+
 import { findFirstPrefixLine } from "./prefixFold";
 import { getPrefixesFromQuery, addPrefixes, removePrefixes, Prefixes } from "./prefixUtils";
 import { getPreviousNonWsToken, getNextNonWsToken, getCompleteToken } from "./tokenUtils";
 import * as sparql11Mode from "../grammar/tokenizer";
-import { Storage as YStorage } from "@triply/yasgui-utils";
-import * as queryString from "query-string";
+import { default as YStorage } from "./utils/Storage";
 import tooltip from "./tooltip";
-import { drawSvgStringAsElement, addClass, removeClass } from "@triply/yasgui-utils";
-import * as Sparql from "./sparql";
+import { drawSvgStringAsElement, addClass, removeClass } from "./utils/utils";
 import * as imgs from "./imgs";
 import * as Autocompleter from "./autocompleters";
 import { merge, escape } from "lodash-es";
@@ -18,25 +15,11 @@ import getDefaults from "./defaults";
 import CodeMirror from "./CodeMirror";
 
 export interface Yasqe {
-  on(eventName: "query", handler: (instance: Yasqe, req: superagent.SuperAgentRequest) => void): void;
-  off(eventName: "query", handler: (instance: Yasqe, req: superagent.SuperAgentRequest) => void): void;
-  on(eventName: "queryAbort", handler: (instance: Yasqe, req: superagent.SuperAgentRequest) => void): void;
-  off(eventName: "queryAbort", handler: (instance: Yasqe, req: superagent.SuperAgentRequest) => void): void;
-  on(
-    eventName: "queryResponse",
-    handler: (instance: Yasqe, req: superagent.SuperAgentRequest, duration: number) => void
-  ): void;
-  off(
-    eventName: "queryResponse",
-    handler: (instance: Yasqe, req: superagent.SuperAgentRequest, duration: number) => void
-  ): void;
   showHint: (conf: HintConfig) => void;
   on(eventName: "error", handler: (instance: Yasqe) => void): void;
   off(eventName: "error", handler: (instance: Yasqe) => void): void;
   on(eventName: "blur", handler: (instance: Yasqe) => void): void;
   off(eventName: "blur", handler: (instance: Yasqe) => void): void;
-  on(eventName: "queryResults", handler: (instance: Yasqe, results: any, duration: number) => void): void;
-  off(eventName: "queryResults", handler: (instance: Yasqe, results: any, duration: number) => void): void;
   on(eventName: "autocompletionShown", handler: (instance: Yasqe, widget: any) => void): void;
   off(eventName: "autocompletionShown", handler: (instance: Yasqe, widget: any) => void): void;
   on(eventName: "autocompletionClose", handler: (instance: Yasqe) => void): void;
@@ -51,16 +34,11 @@ export class Yasqe extends CodeMirror {
   public autocompleters: { [name: string]: Autocompleter.Completer | undefined } = {};
   private prevQueryValid = false;
   public queryValid = true;
-  public lastQueryDuration: number | undefined;
-  private req: superagent.SuperAgentRequest | undefined;
-  private queryStatus: "valid" | "error" | undefined;
-  private queryBtn: HTMLButtonElement | undefined;
   private resizeWrapper?: HTMLDivElement;
   public rootEl: HTMLDivElement;
   public storage: YStorage;
   public config: Config;
   public persistentConfig: PersistentConfig | undefined;
-  public superagent = superagent;
   constructor(parent: HTMLElement, conf: PartialConfig = {}) {
     super();
     if (!parent) throw new Error("No parent passed as argument. Dont know where to draw YASQE");
@@ -80,7 +58,6 @@ export class Yasqe extends CodeMirror {
 
     //Do some post processing
     this.storage = new YStorage(Yasqe.storageNamespace);
-    this.drawButtons();
     const storageId = this.getStorageId();
     // this.getWrapperElement
     if (storageId) {
@@ -95,11 +72,6 @@ export class Yasqe extends CodeMirror {
       if (this.persistentConfig && this.persistentConfig.query) this.setValue(this.persistentConfig.query);
     }
     this.config.autocompleters.forEach((c) => this.enableCompleter(c).then(() => {}, console.warn));
-    if (this.config.consumeShareLink) {
-      this.config.consumeShareLink(this);
-      //and: add a hash listener!
-      window.addEventListener("hashchange", this.handleHashChange);
-    }
     this.checkSyntax();
     // Size codemirror to the
     if (this.persistentConfig && this.persistentConfig.editorHeight) {
@@ -112,12 +84,8 @@ export class Yasqe extends CodeMirror {
     if (this.config.collapsePrefixesOnLoad) this.collapsePrefixes(true);
     this.registerEventListeners();
   }
-  private handleHashChange = () => {
-    this.config.consumeShareLink?.(this);
-  };
   private handleChange() {
     this.checkSyntax();
-    this.updateQueryButton();
   }
   private handleBlur() {
     this.saveQuery();
@@ -125,23 +93,9 @@ export class Yasqe extends CodeMirror {
   private handleChanges() {
     // e.g. handle blur
     this.checkSyntax();
-    this.updateQueryButton();
   }
   private handleCursorActivity() {
     this.autocomplete(true);
-  }
-  private handleQuery(_yasqe: Yasqe, req: superagent.SuperAgentRequest) {
-    this.req = req;
-    this.updateQueryButton();
-  }
-  private handleQueryResponse(_yasqe: Yasqe, _response: superagent.SuperAgentRequest, duration: number) {
-    this.lastQueryDuration = duration;
-    this.req = undefined;
-    this.updateQueryButton();
-  }
-  private handleQueryAbort(_yasqe: Yasqe, _req: superagent.SuperAgentRequest) {
-    this.req = undefined;
-    this.updateQueryButton();
   }
 
   private registerEventListeners() {
@@ -152,10 +106,6 @@ export class Yasqe extends CodeMirror {
     this.on("blur", this.handleBlur);
     this.on("changes", this.handleChanges);
     this.on("cursorActivity", this.handleCursorActivity);
-
-    this.on("query", this.handleQuery);
-    this.on("queryResponse", this.handleQueryResponse);
-    this.on("queryAbort", this.handleQueryAbort);
   }
 
   private unregisterEventListeners() {
@@ -163,10 +113,6 @@ export class Yasqe extends CodeMirror {
     this.off("blur", this.handleBlur);
     this.off("changes" as any, this.handleChanges);
     this.off("cursorActivity" as any, this.handleCursorActivity);
-
-    this.off("query", this.handleQuery);
-    this.off("queryResponse", this.handleQueryResponse);
-    this.off("queryAbort", this.handleQueryAbort);
   }
   /**
    * Generic IDE functions
@@ -181,162 +127,7 @@ export class Yasqe extends CodeMirror {
     if (typeof persistenceId === "string") return persistenceId;
     return persistenceId(this);
   }
-  private drawButtons() {
-    const buttons = document.createElement("div");
-    buttons.className = "yasqe_buttons";
-    this.getWrapperElement().appendChild(buttons);
 
-    if (this.config.pluginButtons) {
-      const pluginButtons = this.config.pluginButtons();
-      if (!pluginButtons) return;
-      if (Array.isArray(pluginButtons)) {
-        for (const button of pluginButtons) {
-          buttons.append(button);
-        }
-      } else {
-        buttons.appendChild(pluginButtons);
-      }
-    }
-
-    /**
-     * draw share link button
-     */
-    if (this.config.createShareableLink) {
-      var svgShare = drawSvgStringAsElement(imgs.share);
-      const shareLinkWrapper = document.createElement("button");
-      shareLinkWrapper.className = "yasqe_share";
-      shareLinkWrapper.title = "Share query";
-      shareLinkWrapper.setAttribute("aria-label", "Share query");
-      shareLinkWrapper.appendChild(svgShare);
-      buttons.appendChild(shareLinkWrapper);
-      shareLinkWrapper.addEventListener("click", (event: MouseEvent) => showSharePopup(event));
-      shareLinkWrapper.addEventListener("keydown", (event: KeyboardEvent) => {
-        if (event.code === "Enter") {
-          showSharePopup(event);
-        }
-      });
-
-      const showSharePopup = (event: MouseEvent | KeyboardEvent) => {
-        event.stopPropagation();
-        let popup: HTMLDivElement | undefined = document.createElement("div");
-        popup.className = "yasqe_sharePopup";
-        buttons.appendChild(popup);
-        document.body.addEventListener(
-          "click",
-          (event) => {
-            if (popup && event.target !== popup && !popup.contains(<any>event.target)) {
-              popup.remove();
-              popup = undefined;
-            }
-          },
-          true
-        );
-        var input = document.createElement("input");
-        input.type = "text";
-        input.value = this.config.createShareableLink(this);
-
-        input.onfocus = function () {
-          input.select();
-        };
-        // Work around Chrome's little problem
-        input.onmouseup = function () {
-          // $this.unbind("mouseup");
-          return false;
-        };
-        popup.innerHTML = "";
-
-        var inputWrapper = document.createElement("div");
-        inputWrapper.className = "inputWrapper";
-
-        inputWrapper.appendChild(input);
-
-        popup.appendChild(inputWrapper);
-
-        // We need to track which buttons are drawn here since the two implementations don't play nice together
-        const popupInputButtons: HTMLButtonElement[] = [];
-        const createShortLink = this.config.createShortLink;
-        if (createShortLink) {
-          popup.className = popup.className += " enableShort";
-          const shortBtn = document.createElement("button");
-          popupInputButtons.push(shortBtn);
-          shortBtn.innerHTML = "Shorten";
-          shortBtn.className = "yasqe_btn yasqe_btn-sm shorten";
-          popup.appendChild(shortBtn);
-          shortBtn.onclick = () => {
-            popupInputButtons.forEach((button) => (button.disabled = true));
-            createShortLink(this, input.value).then(
-              (value) => {
-                input.value = value;
-                input.focus();
-              },
-              (err) => {
-                const errSpan = document.createElement("span");
-                errSpan.className = "shortlinkErr";
-                // Throwing a string or an object should work
-                let textContent = "An error has occurred";
-                if (typeof err === "string" && err.length !== 0) {
-                  textContent = err;
-                } else if (err.message && err.message.length !== 0) {
-                  textContent = err.message;
-                }
-                errSpan.textContent = textContent;
-                input.replaceWith(errSpan);
-              }
-            );
-          };
-        }
-
-        const curlBtn = document.createElement("button");
-        popupInputButtons.push(curlBtn);
-        curlBtn.innerText = "cURL";
-        curlBtn.className = "yasqe_btn yasqe_btn-sm curl";
-        popup.appendChild(curlBtn);
-        curlBtn.onclick = () => {
-          popupInputButtons.forEach((button) => (button.disabled = true));
-          input.value = this.getAsCurlString();
-          input.focus();
-          popup?.appendChild(curlBtn);
-        };
-
-        const svgPos = svgShare.getBoundingClientRect();
-        popup.style.top = svgShare.offsetTop + svgPos.height + "px";
-        popup.style.left = svgShare.offsetLeft + svgShare.clientWidth - popup.clientWidth + "px";
-        input.focus();
-      };
-    }
-    /**
-     * Draw query btn
-     */
-    if (this.config.showQueryButton) {
-      this.queryBtn = document.createElement("button");
-      addClass(this.queryBtn, "yasqe_queryButton");
-
-      /**
-       * Add busy/valid/error btns
-       */
-      const queryEl = drawSvgStringAsElement(imgs.query);
-      addClass(queryEl, "queryIcon");
-      this.queryBtn.appendChild(queryEl);
-
-      const warningIcon = drawSvgStringAsElement(imgs.warning);
-      addClass(warningIcon, "warningIcon");
-      this.queryBtn.appendChild(warningIcon);
-
-      this.queryBtn.onclick = () => {
-        if (this.config.queryingDisabled) return; // Don't do anything
-        if (this.req) {
-          this.abortQuery();
-        } else {
-          this.query().catch(() => {}); //catch this to avoid unhandled rejection
-        }
-      };
-      this.queryBtn.title = "Run query";
-      this.queryBtn.setAttribute("aria-label", "Run query");
-
-      buttons.appendChild(this.queryBtn);
-      this.updateQueryButton();
-    }
-  }
   private drawResizer() {
     if (this.resizeWrapper) return;
     this.resizeWrapper = document.createElement("div");
@@ -386,40 +177,7 @@ export class Yasqe extends CodeMirror {
       this.getDoc().replaceRange(line + "\n" + line, { ch: 0, line: cur.line }, { ch: line.length, line: cur.line });
     }
   }
-  private updateQueryButton(status?: "valid" | "error") {
-    if (!this.queryBtn) return;
 
-    /**
-     * Set query status (valid vs invalid)
-     */
-    if (this.config.queryingDisabled) {
-      addClass(this.queryBtn, "query_disabled");
-      this.queryBtn.title = this.config.queryingDisabled;
-    } else {
-      removeClass(this.queryBtn, "query_disabled");
-      this.queryBtn.title = "Run query";
-      this.queryBtn.setAttribute("aria-label", "Run query");
-    }
-    if (!status) {
-      status = this.queryValid ? "valid" : "error";
-    }
-    if (status != this.queryStatus) {
-      //reset query status classnames
-      removeClass(this.queryBtn, "query_" + this.queryStatus);
-      addClass(this.queryBtn, "query_" + status);
-      this.queryStatus = status;
-    }
-
-    /**
-     * Set/remove spinner if needed
-     */
-    if (this.req && this.queryBtn.className.indexOf("busy") < 0) {
-      this.queryBtn.className = this.queryBtn.className += " busy";
-    }
-    if (!this.req && this.queryBtn.className.indexOf("busy") >= 0) {
-      this.queryBtn.className = this.queryBtn.className.replace("busy", "");
-    }
-  }
   public handleLocalStorageQuotaFull(_e: any) {
     console.warn("Localstorage quota exceeded. Clearing all queries");
     Yasqe.clearStorage();
@@ -833,70 +591,23 @@ export class Yasqe extends CodeMirror {
   /**
    * Querying
    */
-  public query(config?: Sparql.YasqeAjaxConfig) {
-    if (this.config.queryingDisabled) return Promise.reject("Querying is disabled.");
-    // Abort previous request
-    this.abortQuery();
-    return Sparql.executeQuery(this, config);
-  }
-  public getUrlParams() {
-    //first try hash
-    let urlParams: queryString.ParsedQuery = {};
-    if (window.location.hash.length > 1) {
-      //firefox does some decoding if we're using window.location.hash (e.g. the + sign in contentType settings)
-      //Don't want this. So simply get the hash string ourselves
-      urlParams = queryString.parse(location.hash);
-    }
-    if ((!urlParams || !("query" in urlParams)) && window.location.search.length > 1) {
-      //ok, then just try regular url params
-      urlParams = queryString.parse(window.location.search);
-    }
-    return urlParams;
-  }
-  public configToQueryParams(): queryString.ParsedQuery {
-    //extend existing link, so first fetch current arguments
-    var urlParams: any = {};
-    if (window.location.hash.length > 1) urlParams = queryString.parse(window.location.hash);
-    urlParams["query"] = this.getValue();
-    return urlParams;
-  }
-  public queryParamsToConfig(params: queryString.ParsedQuery) {
-    if (params && params.query && typeof params.query === "string") {
-      this.setValue(params.query);
-    }
-  }
-
-  public getAsCurlString(config?: Sparql.YasqeAjaxConfig): string {
-    return Sparql.getAsCurlString(this, config);
-  }
-
-  public abortQuery() {
-    if (this.req) {
-      this.req.abort();
-      this.emit("queryAbort", this, this.req);
-    }
-  }
   public expandEditor() {
     this.setSize(null, "100%");
   }
 
   public destroy() {
-    //  Abort running query;
-    this.abortQuery();
     this.unregisterEventListeners();
     this.resizeWrapper?.removeEventListener("mousedown", this.initDrag, false);
     this.resizeWrapper?.removeEventListener("dblclick", this.expandEditor);
     for (const autocompleter in this.autocompleters) {
       this.disableCompleter(autocompleter);
     }
-    window.removeEventListener("hashchange", this.handleHashChange);
     this.rootEl.remove();
   }
 
   /**
    * Statics
    */
-  static Sparql = Sparql;
   static runMode = (<any>CodeMirror).runMode;
   static clearStorage() {
     const storage = new YStorage(Yasqe.storageNamespace);
@@ -981,23 +692,6 @@ export interface HintConfig {
     ) => void;
   };
 }
-export interface RequestConfig<Y> {
-  queryArgument: string | ((yasqe: Y) => string) | undefined;
-  endpoint: string | ((yasqe: Y) => string);
-  method: "POST" | "GET" | ((yasqe: Y) => "POST" | "GET");
-  acceptHeaderGraph: string | ((yasqe: Y) => string);
-  acceptHeaderSelect: string | ((yasqe: Y) => string);
-  acceptHeaderUpdate: string | ((yasqe: Y) => string);
-  namedGraphs: string[] | ((yasqe: Y) => string[]);
-  defaultGraphs: string[] | ((yasqe: Y) => []);
-  args: Array<{ name: string; value: string }> | ((yasqe: Y) => Array<{ name: string; value: string }>);
-  headers: { [key: string]: string } | ((yasqe: Y) => { [key: string]: string });
-  withCredentials: boolean | ((yasqe: Y) => boolean);
-  adjustQueryBeforeRequest: ((yasqe: Y) => string) | false;
-}
-export type PlainRequestConfig = {
-  [K in keyof RequestConfig<any>]: Exclude<RequestConfig<any>[K], Function>;
-};
 export type PartialConfig = {
   [P in keyof Config]?: Config[P] extends object ? Partial<Config[P]> : Config[P];
 };
@@ -1005,14 +699,6 @@ export interface Config extends Partial<CodeMirror.EditorConfiguration> {
   mode: string;
   collapsePrefixesOnLoad: boolean;
   syntaxErrorCheck: boolean;
-  /**
-   * Show a button with which users can create a link to this query. Set this value to null to disable this functionality.
-   * By default, this feature is enabled, and the only the query value is appended to the link.
-   * ps. This function should return an object which is parseable by jQuery.param (http://api.jquery.com/jQuery.param/)
-   */
-  createShareableLink: (yasqe: Yasqe) => string;
-  createShortLink: ((yasqe: Yasqe, longLink: string) => Promise<string>) | undefined;
-  consumeShareLink: ((yasqe: Yasqe) => void) | undefined | null;
   /**
    * Change persistency settings for the YASQE query value. Setting the values
    * to null, will disable persistancy: nothing is stored between browser
@@ -1023,9 +709,6 @@ export interface Config extends Partial<CodeMirror.EditorConfiguration> {
    */
   persistenceId: ((yasqe: Yasqe) => string) | string | undefined | null;
   persistencyExpire: number; //seconds
-  showQueryButton: boolean;
-  requestConfig: RequestConfig<Yasqe> | ((yasqe: Yasqe) => RequestConfig<Yasqe>);
-  pluginButtons: (() => HTMLElement[] | HTMLElement) | undefined;
   //Addon specific addon ts defs, or missing props from codemirror conf
   highlightSelectionMatches: { showToken?: RegExp; annotateScrollbar?: boolean };
   tabMode: string;
@@ -1036,8 +719,6 @@ export interface Config extends Partial<CodeMirror.EditorConfiguration> {
   hintConfig: Partial<HintConfig>;
   resizeable: boolean;
   editorHeight: string;
-  queryingDisabled: string | undefined; // The string will be the message displayed when hovered
-  prefixCcApi: string; // the suggested default prefixes URL API getter
 }
 export interface PersistentConfig {
   query: string;

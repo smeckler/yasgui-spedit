@@ -5,11 +5,8 @@ import { default as Tab, PersistedJson as PersistedTabJson } from "./Tab";
 import { EndpointSelectConfig, CatalogueItem } from "./endpointSelect";
 import * as shareLink from "./linkUtils";
 import TabElements from "./TabElements";
-import { default as Yasqe, PartialConfig as YasqeConfig, RequestConfig } from "@triply/yasqe";
+import { default as Yasqe, PartialConfig as YasqeConfig } from "@triply/yasqe";
 import { default as Yasr, Config as YasrConfig } from "@triply/yasr";
-export declare type YasguiRequestConfig = Omit<RequestConfig<Yasgui>, "adjustQueryBeforeRequest"> & {
-    adjustQueryBeforeRequest: RequestConfig<Yasqe>["adjustQueryBeforeRequest"];
-};
 export interface Config<EndpointObject extends CatalogueItem = CatalogueItem> {
     autofocus: boolean;
     endpointInfo: ((tab?: Tab) => Element) | undefined;
@@ -25,7 +22,6 @@ export interface Config<EndpointObject extends CatalogueItem = CatalogueItem> {
     persistencyExpire: number;
     yasqe: Partial<YasqeConfig>;
     yasr: YasrConfig;
-    requestConfig: YasguiRequestConfig;
     contextMenuContainer: HTMLElement | undefined;
     nonSslDomain?: string;
 }

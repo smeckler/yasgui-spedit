@@ -2266,12 +2266,9 @@ __metadata:
     "@types/codemirror": 0.0.100
     "@types/lodash-es": ^4.17.3
     "@types/node": 14.0.23
-    "@types/superagent": ^4.1.4
     codemirror: ^5.51.0
     lodash-es: ^4.17.15
     npm-check: ^5.9.0
-    query-string: ^6.10.1
-    superagent: 5.3.1
   peerDependencies:
     "@triply/yasgui": 4.x
   languageName: unknown
@@ -13356,17 +13353,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"query-string@npm:^6.10.1":
-  version: 6.13.1
-  resolution: "query-string@npm:6.13.1"
-  dependencies:
-    decode-uri-component: ^0.2.0
-    split-on-first: ^1.0.0
-    strict-uri-encode: ^2.0.0
-  checksum: fa6a4dbd6eccfff69b804e3391e3bdbf2d26d06c417111b6f0a7fcbe22d13ed88c735f59e869a5cf32fec077adc869fca1fd1f5b8b9bdddcb8a831e7a50d2dc9
-  languageName: node
-  linkType: hard
-
 "querystring-es3@npm:^0.2.0":
   version: 0.2.1
   resolution: "querystring-es3@npm:0.2.1"
@@ -14910,13 +14896,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"split-on-first@npm:^1.0.0":
-  version: 1.1.0
-  resolution: "split-on-first@npm:1.1.0"
-  checksum: 16ff85b54ddcf17f9147210a4022529b343edbcbea4ce977c8f30e38408b8d6e0f25f92cd35b86a524d4797f455e29ab89eb8db787f3c10708e0b47ebf528d30
-  languageName: node
-  linkType: hard
-
 "split-string@npm:^3.0.1, split-string@npm:^3.0.2":
   version: 3.1.0
   resolution: "split-string@npm:3.1.0"
@@ -15090,13 +15069,6 @@ __metadata:
   version: 1.1.0
   resolution: "strict-uri-encode@npm:1.1.0"
   checksum: 9466d371f7b36768d43f7803f26137657559e4c8b0161fb9e320efb8edba3ae22f8e99d4b0d91da023b05a13f62ec5412c3f4f764b5788fac11d1fea93720bb3
-  languageName: node
-  linkType: hard
-
-"strict-uri-encode@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "strict-uri-encode@npm:2.0.0"
-  checksum: eaac4cf978b6fbd480f1092cab8b233c9b949bcabfc9b598dd79a758f7243c28765ef7639c876fa72940dac687181b35486ea01ff7df3e65ce3848c64822c581
   languageName: node
   linkType: hard
 

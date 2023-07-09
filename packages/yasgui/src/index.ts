@@ -7,7 +7,7 @@ import { default as Tab, PersistedJson as PersistedTabJson } from "./Tab";
 import { EndpointSelectConfig, CatalogueItem } from "./endpointSelect";
 import * as shareLink from "./linkUtils";
 import TabElements from "./TabElements";
-import { default as Yasqe, PartialConfig as YasqeConfig, RequestConfig } from "@triply/yasqe";
+import { default as Yasqe, PartialConfig as YasqeConfig } from "@triply/yasqe";
 import { default as Yasr, Config as YasrConfig } from "@triply/yasr";
 import { addClass, removeClass } from "@triply/yasgui-utils";
 require("./index.scss");
@@ -19,9 +19,6 @@ if (window) {
   if (Yasqe) (window as any).Yasqe = Yasqe;
   if (Yasr) (window as any).Yasr = Yasr;
 }
-export type YasguiRequestConfig = Omit<RequestConfig<Yasgui>, "adjustQueryBeforeRequest"> & {
-  adjustQueryBeforeRequest: RequestConfig<Yasqe>["adjustQueryBeforeRequest"];
-};
 export interface Config<EndpointObject extends CatalogueItem = CatalogueItem> {
   /**
    * Autofocus yasqe on load or tab switch
@@ -41,7 +38,6 @@ export interface Config<EndpointObject extends CatalogueItem = CatalogueItem> {
   persistencyExpire: number;
   yasqe: Partial<YasqeConfig>;
   yasr: YasrConfig;
-  requestConfig: YasguiRequestConfig;
   contextMenuContainer: HTMLElement | undefined;
   nonSslDomain?: string;
 }
@@ -106,7 +102,7 @@ export class Yasgui extends EventEmitter {
     let executeIdAfterInit: string | undefined;
     let optionsFromUrl: PersistedTabJson | undefined;
     if (this.config.populateFromUrl) {
-      optionsFromUrl = shareLink.getConfigFromUrl(Tab.getDefaults(this));
+      optionsFromUrl = undefined;
       if (optionsFromUrl) {
         const tabId = this.findTabIdForConfig(optionsFromUrl);
         if (tabId) {
@@ -229,40 +225,7 @@ export class Yasgui extends EventEmitter {
    * @param tab2 Second comparable object
    */
   private tabConfigEquals(tab1: PersistedTabJson, tab2: PersistedTabJson): boolean {
-    let sameRequest = true;
-
-    /**
-     * Check request config
-     */
-    let key: keyof RequestConfig<Yasgui>;
-    for (key in tab1.requestConfig) {
-      if (!tab1.requestConfig[key]) continue;
-      if (!isEqual(tab2.requestConfig[key], tab1.requestConfig[key])) {
-        sameRequest = false;
-      }
-    }
-    /**
-     * Check yasqe settings
-     */
-    if (sameRequest) {
-      sameRequest = (<Array<keyof PersistedTabJson["yasqe"]>>["endpoint", "value"]).every(
-        (key) => tab1.yasqe[key] === tab2.yasqe[key]
-      );
-    }
-
-    /**
-     * Check yasr settings
-     */
-    if (sameRequest) {
-      sameRequest =
-        tab1.yasr.settings.selectedPlugin === tab2.yasr.settings.selectedPlugin &&
-        isEqual(
-          tab1.yasr.settings.pluginsConfig?.[tab1.yasr.settings?.selectedPlugin || ""],
-          tab2.yasr.settings.pluginsConfig?.[tab2.yasr.settings?.selectedPlugin || ""]
-        );
-    }
-
-    return sameRequest && tab1.name === tab2.name;
+    return true;
   }
   private findTabIdForConfig(tabConfig: PersistedTabJson) {
     return this.persistentConfig.getTabs().find((tabId) => {
@@ -304,13 +267,6 @@ export class Yasgui extends EventEmitter {
     const tabConfig = merge({}, Tab.getDefaults(this), partialTabConfig);
     if (tabConfig.id && this.getTab(tabConfig.id)) {
       throw new Error("Duplicate tab ID");
-    }
-    // Check if we should copy the endpoint in the new tab and only copy if the tabConfig doesn't contain an endpoint
-    if (this.config.copyEndpointOnNewTab && !partialTabConfig?.requestConfig?.endpoint) {
-      const currentTab = this.getTab();
-      if (currentTab) {
-        tabConfig.requestConfig.endpoint = currentTab.getEndpoint();
-      }
     }
     if (opts.avoidDuplicateTabs) {
       const foundTabId = this.findTabIdForConfig(tabConfig);

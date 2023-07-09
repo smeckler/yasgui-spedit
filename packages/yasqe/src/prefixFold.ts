@@ -1,6 +1,7 @@
 import { default as Yasqe, Position } from "./";
 import CodeMirror from "codemirror";
 import * as TokenUtils from "./tokenUtils";
+
 const PREFIX_KEYWORD = "PREFIX ";
 
 export function findFirstPrefixLine(yasqe: Yasqe) {
